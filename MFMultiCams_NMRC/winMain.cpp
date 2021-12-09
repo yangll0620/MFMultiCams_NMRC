@@ -23,9 +23,11 @@ template <class T> void SafeRelease(T** ppT)
 
 #include "resource.h"
 #include "DeviceList.h"
+#include "CCapture.h"
 
 
 DeviceList  g_devices;
+CCapture* g_pCapture = NULL;
 HDEVNOTIFY  g_hdevnotify = NULL;
 
 
@@ -141,6 +143,21 @@ void OnInitDialog(HWND hDlg)
 
 void OnCloseDialog()
 {
+    if (g_pCapture)
+    {
+        g_pCapture->EndCaptureSession();
+    }
+
+    SafeRelease(&g_pCapture);
+
+    g_devices.Clear();
+
+    if (g_hdevnotify)
+    {
+        UnregisterDeviceNotification(g_hdevnotify);
+    }
+
+    MFShutdown();
     CoUninitialize();
 }
 
