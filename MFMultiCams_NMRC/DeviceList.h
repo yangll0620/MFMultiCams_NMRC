@@ -21,4 +21,3 @@ public:
     HRESULT GetDevice(UINT32 index, IMFActivate** ppActivate);
     HRESULT GetDeviceName(UINT32 index, WCHAR** ppszName);
 };
-
