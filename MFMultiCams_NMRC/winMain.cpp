@@ -23,11 +23,11 @@ template <class T> void SafeRelease(T** ppT)
 
 #include "resource.h"
 #include "DeviceList.h"
-#include "CCapture.h"
+#include "CVideo.h"
 
 
 DeviceList  g_devices;
-CCapture* g_pCapture = NULL;
+CVideo* g_pVideo = NULL;
 HDEVNOTIFY  g_hdevnotify = NULL;
 
 
@@ -36,6 +36,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 void    OnInitDialog(HWND hDlg);
 void    OnCloseDialog();
 
+void    StartCapture(HWND hDlg);
 
 HRESULT UpdateDeviceList(HWND hDlg);
 
@@ -77,6 +78,8 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
                 ::EndDialog(hDlg, IDCANCEL);
                 return TRUE;
 
+            case IDC_CAPTURE:
+                StartCapture(hDlg);
         }
         break;
     }
@@ -143,7 +146,7 @@ void OnInitDialog(HWND hDlg)
 
 void OnCloseDialog()
 {
-    if (g_pCapture)
+    /*if (g_pCapture)
     {
         g_pCapture->EndCaptureSession();
     }
@@ -158,7 +161,7 @@ void OnCloseDialog()
     }
 
     MFShutdown();
-    CoUninitialize();
+    CoUninitialize();*/
 }
 
 
@@ -207,58 +210,17 @@ done:
 
 
 
-HRESULT EnumerateCaptureFormats(IMFMediaSource* pSource)
+void StartCapture(HWND hDlg)
 {
-    IMFPresentationDescriptor* pPD = NULL;
-    IMFStreamDescriptor* pSD = NULL;
-    IMFMediaTypeHandler* pHandler = NULL;
-    IMFMediaType* pType = NULL;
+    IMFActivate* pActivate = NULL;
 
-    HRESULT hr = pSource->CreatePresentationDescriptor(&pPD);
-    if (FAILED(hr))
-    {
-        goto done;
-    }
+    UINT32 iDeviceIndex = 0;
+    g_devices.GetDevice(0, &pActivate);
 
-    BOOL fSelected;
-    hr = pPD->GetStreamDescriptorByIndex(0, &fSelected, &pSD);
-    if (FAILED(hr))
-    {
-        goto done;
-    }
+    // Create the media source for the capture device.
+    g_pVideo = new CVideo();
 
-    hr = pSD->GetMediaTypeHandler(&pHandler);
-    if (FAILED(hr))
-    {
-        goto done;
-    }
-
-    DWORD cTypes = 0;
-    hr = pHandler->GetMediaTypeCount(&cTypes);
-    if (FAILED(hr))
-    {
-        goto done;
-    }
-
-    for (DWORD i = 0; i < cTypes; i++)
-    {
-        hr = pHandler->GetMediaTypeByIndex(i, &pType);
-        if (FAILED(hr))
-        {
-            goto done;
-        }
-
-        LogMediaType(pType);
-        OutputDebugString(L"\n");
-
-        SafeRelease(&pType);
-    }
-
-done:
-    SafeRelease(&pPD);
-    SafeRelease(&pSD);
-    SafeRelease(&pHandler);
-    SafeRelease(&pType);
-    return hr;
+    // Set Source Reader
+    g_pVideo->SetSourceReader(pActivate);
 }
 

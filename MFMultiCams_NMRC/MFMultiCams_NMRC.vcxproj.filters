@@ -21,7 +21,7 @@
     <ClCompile Include="DeviceList.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CCapture.cpp">
+    <ClCompile Include="CVideo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,7 +32,7 @@
     <ClInclude Include="DeviceList.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CCapture.h">
+    <ClInclude Include="CVideo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -140,12 +140,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CCapture.cpp" />
+    <ClCompile Include="CVideo.cpp" />
     <ClCompile Include="DeviceList.cpp" />
     <ClCompile Include="winMain.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CCapture.h" />
+    <ClInclude Include="CVideo.h" />
     <ClInclude Include="DeviceList.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
