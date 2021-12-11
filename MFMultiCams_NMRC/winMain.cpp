@@ -24,6 +24,7 @@ template <class T> void SafeRelease(T** ppT)
 #include "resource.h"
 #include "DeviceList.h"
 #include "CVideo.h"
+#include "RenderingWindow.h"
 
 
 DeviceList  g_devices;
@@ -222,5 +223,23 @@ void StartCapture(HWND hDlg)
 
     // Set Source Reader
     g_pVideo->SetSourceReader(pActivate);
+
+
+    MSG msg{ 0 };
+    RenderingWindow window((LPWSTR)"Microsoft Media Foundation Example", g_pVideo->width, g_pVideo->height, 10);
+    while (msg.message != WM_QUIT)
+    {
+        window.Draw(g_pVideo->rawData, g_pVideo->width, g_pVideo->height);
+        while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+        {
+            if (window.windowHandle && IsDialogMessage(window.windowHandle, &msg))
+            {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+    }
 }
 

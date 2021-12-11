@@ -142,11 +142,13 @@
   <ItemGroup>
     <ClCompile Include="CVideo.cpp" />
     <ClCompile Include="DeviceList.cpp" />
+    <ClCompile Include="RenderingWindow.cpp" />
     <ClCompile Include="winMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CVideo.h" />
     <ClInclude Include="DeviceList.h" />
+    <ClInclude Include="RenderingWindow.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
