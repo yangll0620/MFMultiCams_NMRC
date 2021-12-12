@@ -219,7 +219,7 @@ void StartCapture(HWND hDlg)
     g_devices.GetDevice(0, &pActivate);
 
     // Create the media source for the capture device.
-    g_pVideo = new CVideo();
+    g_pVideo = new CVideo(hDlg);
 
     // Set Source Reader
     g_pVideo->SetSourceReader(pActivate);
@@ -229,7 +229,7 @@ void StartCapture(HWND hDlg)
     RenderingWindow window((LPWSTR)"Microsoft Media Foundation Example", g_pVideo->width, g_pVideo->height, 10);
     while (msg.message != WM_QUIT)
     {
-        window.Draw(g_pVideo->rawData, g_pVideo->width, g_pVideo->height);
+        //window.Draw(g_pVideo->rawData, g_pVideo->width, g_pVideo->height);
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
             if (window.windowHandle && IsDialogMessage(window.windowHandle, &msg))

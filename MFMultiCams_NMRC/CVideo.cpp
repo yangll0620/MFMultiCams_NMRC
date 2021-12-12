@@ -20,7 +20,7 @@ template <class T> void SafeRelease(T** ppT)
 #include "CVideo.h"
 
 
-CVideo::CVideo()
+CVideo::CVideo(HWND hwnd)
 {
     InitializeCriticalSection(&m_critsec);
     m_nRefCount = 1;
@@ -29,6 +29,9 @@ CVideo::CVideo()
     width = 0;
     height = 0;
     rawData = NULL;
+    m_bFirstSample = FALSE;
+    m_llBaseTime = 0;
+    m_hwndEvent = hwnd;
 }
 
 
@@ -106,6 +109,9 @@ HRESULT CVideo::SetSourceReader(IMFActivate* device) {
 
     if (SUCCEEDED(hr))
     {
+        m_bFirstSample = TRUE;
+        m_llBaseTime = 0;
+
         // Ask for the first sample.
         hr = m_pReader->ReadSample((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, NULL, NULL, NULL, NULL);
     }
@@ -185,7 +191,6 @@ HRESULT CVideo::GetDefaultStride(IMFMediaType* type, LONG* stride)
 HRESULT CVideo::OnReadSample(HRESULT status, DWORD streamIndex, DWORD streamFlags, LONGLONG timeStamp, IMFSample* sample)
 {
     HRESULT hr = S_OK;
-    IMFMediaBuffer* mediaBuffer = NULL;
 
     EnterCriticalSection(&m_critsec);
 
@@ -196,24 +201,22 @@ HRESULT CVideo::OnReadSample(HRESULT status, DWORD streamIndex, DWORD streamFlag
     }
         
 
-    if (SUCCEEDED(hr))
+    if (sample)
     {
-        if (sample)
-        {// Get the video frame buffer from the sample.
-            hr = sample->GetBufferByIndex(0, &mediaBuffer);
-            // Draw the frame.
-            if (SUCCEEDED(hr))
-            {
-                BYTE* data;
-                mediaBuffer->Lock(&data, NULL, NULL);
-                //This is a good place to perform color conversion and drawing
-                                //ColorConversion(data);
-                                //Draw(data)
-//Instead we're copying the data to a buffer
-                CopyMemory(rawData, data, width * height * bytesPerPixel);
-            }
+        if (m_bFirstSample)
+        {
+            m_llBaseTime = timeStamp;
+            m_bFirstSample = FALSE;
         }
+
+        // rebase the time stamp
+        timeStamp -= m_llBaseTime;
+
+        hr = sample->SetSampleTime(timeStamp);
+
+        if (FAILED(hr)) { goto done; }
     }
+
     // Request the next frame.
     if (SUCCEEDED(hr))
         hr = m_pReader ->ReadSample((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, NULL, NULL, NULL, NULL);
@@ -221,8 +224,10 @@ HRESULT CVideo::OnReadSample(HRESULT status, DWORD streamIndex, DWORD streamFlag
    
 
 done:
-
-    if (mediaBuffer) { mediaBuffer->Release(); mediaBuffer = NULL; }
+    if (FAILED(hr))
+    {
+        NotifyError(hr);
+    }
     LeaveCriticalSection(&m_critsec);
     return hr;
 }

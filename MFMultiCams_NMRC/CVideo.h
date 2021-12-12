@@ -1,4 +1,6 @@
 #pragma once
+const UINT WM_APP_PREVIEW_ERROR = WM_APP + 1;    // wparam = HRESULT
+
 class CVideo : public IMFSourceReaderCallback
 {
 public:
@@ -9,7 +11,7 @@ public:
     LONG stride;
     int bytesPerPixel;
 
-    CVideo();
+    CVideo(HWND hwnd);
     ~CVideo();
 
 
@@ -36,11 +38,18 @@ public:
     }
 
 protected:
+    void    NotifyError(HRESULT hr) { PostMessage(m_hwndEvent, WM_APP_PREVIEW_ERROR, (WPARAM)hr, 0L); }
+
     long m_nRefCount; // Reference count.
     CRITICAL_SECTION        m_critsec;
+
+    HWND                    m_hwndEvent;        // Application window to receive events.
 
     WCHAR* m_pwszSymbolicLink;
 
     IMFSourceReader* m_pReader;
+
+    BOOL                    m_bFirstSample;
+    LONGLONG                m_llBaseTime;
 };
 
