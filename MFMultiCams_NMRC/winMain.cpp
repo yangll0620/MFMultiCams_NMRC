@@ -10,6 +10,14 @@
 #include <ks.h>
 #include <ksmedia.h>
 
+struct BGRAPixel
+{
+    BYTE b;
+    BYTE g;
+    BYTE r;
+    BYTE a;
+};
+
 
 template <class T> void SafeRelease(T** ppT)
 {
@@ -225,10 +233,16 @@ void StartCapture(HWND hDlg)
     g_pVideo->SetSourceReader(pActivate);
 
 
+
+
+    // Show the Frame
+    BGRAPixel* bgraBuffer = new BGRAPixel[g_pVideo->width * g_pVideo->height];
     MSG msg{ 0 };
     RenderingWindow window((LPWSTR)"Microsoft Media Foundation Example", g_pVideo->width, g_pVideo->height, 10);
     while (msg.message != WM_QUIT)
     {
+        //RGB24_to_BGRA32(bgraBuffer, m->rawData, m->width, m->height);
+
         //window.Draw(g_pVideo->rawData, g_pVideo->width, g_pVideo->height);
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {

@@ -78,9 +78,15 @@ HRESULT CVideo::SetSourceReader(IMFActivate* device) {
     if (SUCCEEDED(hr))
         hr = pAttributes->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, this);
 
+
+    if (SUCCEEDED(hr))
+        hr = EnumerateCaptureFormats(pSource);
+
     //Create the source reader
     if (SUCCEEDED(hr))
         hr = MFCreateSourceReaderFromMediaSource(pSource, pAttributes, &m_pReader);
+
+
 
 
     // Try to find a suitable output type.
@@ -183,6 +189,60 @@ HRESULT CVideo::GetDefaultStride(IMFMediaType* type, LONG* stride)
     return hr;
 }
 
+HRESULT EnumerateCaptureFormats(IMFMediaSource* pSource)
+{
+    IMFPresentationDescriptor* pPD = NULL;
+    IMFStreamDescriptor* pSD = NULL;
+    IMFMediaTypeHandler* pHandler = NULL;
+    IMFMediaType* pType = NULL;
+
+    DWORD cTypes = 0;
+
+    HRESULT hr = pSource->CreatePresentationDescriptor(&pPD);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    BOOL fSelected;
+    hr = pPD->GetStreamDescriptorByIndex(0, &fSelected, &pSD);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    hr = pSD->GetMediaTypeHandler(&pHandler);
+    if (FAILED(hr))
+    {
+        goto done;
+    } 
+    hr = pHandler->GetMediaTypeCount(&cTypes);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    for (DWORD i = 0; i < cTypes; i++)
+    {
+        hr = pHandler->GetMediaTypeByIndex(i, &pType);
+        if (FAILED(hr))
+        {
+            goto done;
+        }
+
+        //LogMediaType(pType);
+        OutputDebugString(L"\n");
+
+        SafeRelease(&pType);
+    }
+
+done:
+    SafeRelease(&pPD);
+    SafeRelease(&pSD);
+    SafeRelease(&pHandler);
+    SafeRelease(&pType);
+    return hr;
+}
 
 
 /////////////// IMFSourceReaderCallback methods ///////////////

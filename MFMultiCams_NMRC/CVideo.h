@@ -19,6 +19,8 @@ public:
     HRESULT IsMediaTypeSupported(IMFMediaType* pType);
     HRESULT GetDefaultStride(IMFMediaType* type, LONG* stride);
 
+    HRESULT EnumerateCaptureFormats(IMFMediaSource* pSource);
+
 
     // the class must implement the methods from IUnknown
     STDMETHODIMP QueryInterface(REFIID iid, void** ppv);
