@@ -8,6 +8,8 @@
 #include <Dbt.h>
 #include <shlwapi.h>
 
+
+
 template <class T> void SafeRelease(T** ppT)
 {
     if (*ppT)
@@ -18,6 +20,8 @@ template <class T> void SafeRelease(T** ppT)
 }
 
 #include "CVideo.h"
+
+
 
 
 CVideo::CVideo(HWND hwnd)
@@ -42,7 +46,41 @@ CVideo::~CVideo()
 }
 
 
-HRESULT CVideo::SetSourceReader(IMFActivate* device) {
+//-------------------------------------------------------------------
+// OpenMediaSource
+//
+// Set up preview for a specified media source. 
+//-------------------------------------------------------------------
+
+HRESULT CVideo::CreateReaderSource(IMFMediaSource* pSource)
+{
+
+    HRESULT hr = S_OK;
+
+    IMFAttributes* pAttributes = NULL;
+
+    hr = MFCreateAttributes(&pAttributes, 2);
+
+    if (SUCCEEDED(hr))
+    {
+        hr = pAttributes->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, this);
+    }
+
+    if (SUCCEEDED(hr))
+    {
+        hr = MFCreateSourceReaderFromMediaSource(
+            pSource,
+            pAttributes,
+            &m_pReader
+        );
+    }
+
+    SafeRelease(&pAttributes);
+    return hr;
+}
+
+
+HRESULT CVideo::StartCapture(IMFActivate* device) {
     HRESULT hr = S_OK;
 
     IMFMediaSource* pSource = NULL;
@@ -64,55 +102,21 @@ HRESULT CVideo::SetSourceReader(IMFActivate* device) {
             NULL);
     }
 
-
-    //Allocate attributes
-    if (SUCCEEDED(hr))
-        hr = MFCreateAttributes(&pAttributes, 2);
-
-
-    //ser attributes
-    if (SUCCEEDED(hr))
-        hr = pAttributes->SetUINT32(MF_READWRITE_DISABLE_CONVERTERS, TRUE);
-
-    // Set the callback pointer, operate in asynchronous mode
-    if (SUCCEEDED(hr))
-        hr = pAttributes->SetUnknown(MF_SOURCE_READER_ASYNC_CALLBACK, this);
-
-
-    if (SUCCEEDED(hr))
-        hr = EnumerateCaptureFormats(pSource);
-
-    //Create the source reader
-    if (SUCCEEDED(hr))
-        hr = MFCreateSourceReaderFromMediaSource(pSource, pAttributes, &m_pReader);
-
-
-
-
-    // Try to find a suitable output type.
     if (SUCCEEDED(hr))
     {
-        for (DWORD i = 0; ; i++)
-        {
-            hr = m_pReader->GetNativeMediaType((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, i, &mediaType);
-            if (FAILED(hr)) { break; }
-
-            hr = IsMediaTypeSupported(mediaType);
-            if (FAILED(hr)) { break; }
-            //Get width and height
-            MFGetAttributeSize(mediaType, MF_MT_FRAME_SIZE, &width, &height);
-            if (mediaType)
-            {
-                mediaType->Release(); 
-                mediaType = NULL;
-            }
-
-            if (SUCCEEDED(hr))// Found an output type.
-                break;
-        }
+        GetMinMaxFrameRate(pSource);
     }
 
+    if (SUCCEEDED(hr))
+    {
+        EnumerateCaptureFormats(pSource);
+    }
 
+    if (SUCCEEDED(hr))
+    {
+        CreateReaderSource(pSource);
+    }
+   
     if (SUCCEEDED(hr))
     {
         m_bFirstSample = TRUE;
@@ -189,7 +193,7 @@ HRESULT CVideo::GetDefaultStride(IMFMediaType* type, LONG* stride)
     return hr;
 }
 
-HRESULT EnumerateCaptureFormats(IMFMediaSource* pSource)
+HRESULT CVideo::EnumerateCaptureFormats(IMFMediaSource* pSource)
 {
     IMFPresentationDescriptor* pPD = NULL;
     IMFStreamDescriptor* pSD = NULL;
@@ -235,6 +239,76 @@ HRESULT EnumerateCaptureFormats(IMFMediaSource* pSource)
 
         SafeRelease(&pType);
     }
+
+done:
+    SafeRelease(&pPD);
+    SafeRelease(&pSD);
+    SafeRelease(&pHandler);
+    SafeRelease(&pType);
+    return hr;
+}
+
+
+
+HRESULT CVideo::GetMinMaxFrameRate(IMFMediaSource* pSource)
+{
+    IMFPresentationDescriptor* pPD = NULL;
+    IMFStreamDescriptor* pSD = NULL;
+    IMFMediaTypeHandler* pHandler = NULL;
+    IMFMediaType* pType = NULL;
+
+    HRESULT hr = pSource->CreatePresentationDescriptor(&pPD);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    BOOL fSelected;
+    hr = pPD->GetStreamDescriptorByIndex(0, &fSelected, &pSD);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    hr = pSD->GetMediaTypeHandler(&pHandler);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    hr = pHandler->GetCurrentMediaType(&pType);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    // Get the maximum frame rate for the selected capture format.
+
+    // Note: To get the minimum frame rate, use the 
+    // MF_MT_FRAME_RATE_RANGE_MIN attribute instead.
+
+
+    UINT32 numerator, denominator;
+    hr = MFGetAttributeRatio(pType, MF_MT_FRAME_RATE_RANGE_MAX, &numerator, &denominator);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+
+    PROPVARIANT varMax, varMin;
+    hr = pType->GetItem(MF_MT_FRAME_RATE_RANGE_MAX, &varMax);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
+    hr = pType->GetItem(MF_MT_FRAME_RATE_RANGE_MIN, &varMin);
+    if (FAILED(hr))
+    {
+        goto done;
+    }
+
 
 done:
     SafeRelease(&pPD);

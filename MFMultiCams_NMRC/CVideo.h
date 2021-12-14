@@ -14,12 +14,13 @@ public:
     CVideo(HWND hwnd);
     ~CVideo();
 
-
-    HRESULT SetSourceReader(IMFActivate* device);
+    HRESULT CreateReaderSource(IMFMediaSource* pSource);
+    HRESULT StartCapture(IMFActivate* device);
     HRESULT IsMediaTypeSupported(IMFMediaType* pType);
     HRESULT GetDefaultStride(IMFMediaType* type, LONG* stride);
 
     HRESULT EnumerateCaptureFormats(IMFMediaSource* pSource);
+    HRESULT GetMinMaxFrameRate(IMFMediaSource* pSource);
 
 
     // the class must implement the methods from IUnknown
