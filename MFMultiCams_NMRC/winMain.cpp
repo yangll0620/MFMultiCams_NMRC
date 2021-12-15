@@ -98,6 +98,8 @@ HRESULT LogAttributeValueByIndex(IMFAttributes* pAttr, DWORD index)
     PROPVARIANT var;
     PropVariantInit(&var);
 
+    bool sample60 = false;
+
     HRESULT hr = pAttr->GetItemByIndex(index, &guid, &var);
     if (FAILED(hr))
     {
@@ -110,172 +112,90 @@ HRESULT LogAttributeValueByIndex(IMFAttributes* pAttr, DWORD index)
         goto done;
     }
 
-    DBGMSG(L"\t%s\t", pGuidName);
 
-    hr = SpecialCaseAttributeValue(guid, var);
-    if (FAILED(hr))
+    
+    // only show frame rate, frame size and subtype
+    if ((guid == MF_MT_FRAME_RATE) || (guid == MF_MT_FRAME_SIZE) || (guid == MF_MT_SUBTYPE))
+    {
+        DBGMSG(L"\t%s\t", pGuidName);
+    }
+    else
     {
         goto done;
     }
-    if (hr == S_FALSE)
+
+    if ((guid == MF_MT_FRAME_RATE) || (guid == MF_MT_FRAME_SIZE))
     {
-        switch (var.vt)
+        UINT32 uHigh, uLow;
+        Unpack2UINT32AsUINT64(var.uhVal.QuadPart, &uHigh, &uLow);
+        DBGMSG(L"%d x %d", uHigh, uLow);
+
+        if (guid == MF_MT_FRAME_RATE)
         {
-        case VT_UI4:
-            DBGMSG(L"%d", var.ulVal);
-            break;
-
-        case VT_UI8:
-            DBGMSG(L"%I64d", var.uhVal);
-            break;
-
-        case VT_R8:
-            DBGMSG(L"%f", var.dblVal);
-            break;
-
-        case VT_CLSID:
-            hr = GetGUIDName(*var.puuid, &pGuidValName);
-            if (SUCCEEDED(hr))
+            if (uHigh == 60 || uLow == 60)
             {
-                DBGMSG(pGuidValName);
+                sample60 = true;
             }
-            break;
-
-        case VT_LPWSTR:
-            DBGMSG(var.pwszVal);
-            break;
-
-        case VT_VECTOR | VT_UI1:
-            DBGMSG(L"<<byte array>>");
-            break;
-
-        case VT_UNKNOWN:
-            DBGMSG(L"IUnknown");
-            break;
-
-        default:
-            DBGMSG(L"Unexpected attribute type (vt = %d)", var.vt);
-            break;
         }
     }
+    else 
+    {
+        hr = SpecialCaseAttributeValue(guid, var);
+        if (FAILED(hr))
+        {
+            goto done;
+        }
+
+        if (hr == S_FALSE)
+        {
+            switch (var.vt)
+            {
+            case VT_UI4:
+                DBGMSG(L"%d", var.ulVal);
+                break;
+
+            case VT_UI8:
+                DBGMSG(L"%I64d", var.uhVal);
+                break;
+
+            case VT_R8:
+                DBGMSG(L"%f", var.dblVal);
+                break;
+
+            case VT_CLSID:
+                hr = GetGUIDName(*var.puuid, &pGuidValName);
+                if (SUCCEEDED(hr))
+                {
+                    DBGMSG(pGuidValName);
+                }
+                break;
+
+            case VT_LPWSTR:
+                DBGMSG(var.pwszVal);
+                break;
+
+            case VT_VECTOR | VT_UI1:
+                DBGMSG(L"<<byte array>>");
+                break;
+
+            case VT_UNKNOWN:
+                DBGMSG(L"IUnknown");
+                break;
+
+            default:
+                DBGMSG(L"Unexpected attribute type (vt = %d)", var.vt);
+                break;
+            }
+        }
+    }
+    
+    DBGMSG(L"\n");
 
 done:
-    DBGMSG(L"\n");
     CoTaskMemFree(pGuidName);
     CoTaskMemFree(pGuidValName);
     PropVariantClear(&var);
     return hr;
-}
-
-HRESULT GetGUIDName(const GUID& guid, WCHAR** ppwsz)
-{
-    HRESULT hr = S_OK;
-    WCHAR* pName = NULL;
-
-    LPCWSTR pcwsz = GetGUIDNameConst(guid);
-    if (pcwsz)
-    {
-        size_t cchLength = 0;
-
-        hr = StringCchLength(pcwsz, STRSAFE_MAX_CCH, &cchLength);
-        if (FAILED(hr))
-        {
-            goto done;
-        }
-
-        pName = (WCHAR*)CoTaskMemAlloc((cchLength + 1) * sizeof(WCHAR));
-
-        if (pName == NULL)
-        {
-            hr = E_OUTOFMEMORY;
-            goto done;
-        }
-
-        hr = StringCchCopy(pName, cchLength + 1, pcwsz);
-        if (FAILED(hr))
-        {
-            goto done;
-        }
-    }
-    else
-    {
-        hr = StringFromCLSID(guid, &pName);
-    }
-
-done:
-    if (FAILED(hr))
-    {
-        *ppwsz = NULL;
-        CoTaskMemFree(pName);
-    }
-    else
-    {
-        *ppwsz = pName;
-    }
-    return hr;
-}
-
-void LogUINT32AsUINT64(const PROPVARIANT& var)
-{
-    UINT32 uHigh = 0, uLow = 0;
-    Unpack2UINT32AsUINT64(var.uhVal.QuadPart, &uHigh, &uLow);
-    DBGMSG(L"%d x %d", uHigh, uLow);
-}
-
-float OffsetToFloat(const MFOffset& offset)
-{
-    return offset.value + (static_cast<float>(offset.fract) / 65536.0f);
-}
-
-HRESULT LogVideoArea(const PROPVARIANT& var)
-{
-    if (var.caub.cElems < sizeof(MFVideoArea))
-    {
-        return S_FALSE;
-    }
-
-    MFVideoArea* pArea = (MFVideoArea*)var.caub.pElems;
-
-    DBGMSG(L"(%f,%f) (%d,%d)", OffsetToFloat(pArea->OffsetX), OffsetToFloat(pArea->OffsetY),
-        pArea->Area.cx, pArea->Area.cy);
-    return S_OK;
-}
-
-// Handle certain known special cases.
-HRESULT SpecialCaseAttributeValue(GUID guid, const PROPVARIANT& var)
-{
-    if ((guid == MF_MT_FRAME_RATE) || (guid == MF_MT_FRAME_RATE_RANGE_MAX) ||
-        (guid == MF_MT_FRAME_RATE_RANGE_MIN) || (guid == MF_MT_FRAME_SIZE) ||
-        (guid == MF_MT_PIXEL_ASPECT_RATIO))
-    {
-        // Attributes that contain two packed 32-bit values.
-        LogUINT32AsUINT64(var);
-    }
-    else if ((guid == MF_MT_GEOMETRIC_APERTURE) ||
-        (guid == MF_MT_MINIMUM_DISPLAY_APERTURE) ||
-        (guid == MF_MT_PAN_SCAN_APERTURE))
-    {
-        // Attributes that an MFVideoArea structure.
-        return LogVideoArea(var);
-    }
-    else
-    {
-        return S_FALSE;
-    }
-    return S_OK;
-}
-
-void DBGMSG(PCWSTR format, ...)
-{
-    va_list args;
-    va_start(args, format);
-
-    WCHAR msg[MAX_PATH];
-
-    if (SUCCEEDED(StringCbVPrintf(msg, sizeof(msg), format, args)))
-    {
-        OutputDebugString(msg);
-    }
 }
 
 #ifndef IF_EQUAL_RETURN
@@ -430,6 +350,117 @@ LPCWSTR GetGUIDNameConst(const GUID& guid)
     IF_EQUAL_RETURN(guid, MFAudioFormat_ADTS); //             WAVE_FORMAT_MPEG_ADTS_AAC 
 
     return NULL;
+}
+
+HRESULT GetGUIDName(const GUID& guid, WCHAR** ppwsz)
+{
+    HRESULT hr = S_OK;
+    WCHAR* pName = NULL;
+
+    LPCWSTR pcwsz = GetGUIDNameConst(guid);
+    if (pcwsz)
+    {
+        size_t cchLength = 0;
+
+        hr = StringCchLength(pcwsz, STRSAFE_MAX_CCH, &cchLength);
+        if (FAILED(hr))
+        {
+            goto done;
+        }
+
+        pName = (WCHAR*)CoTaskMemAlloc((cchLength + 1) * sizeof(WCHAR));
+
+        if (pName == NULL)
+        {
+            hr = E_OUTOFMEMORY;
+            goto done;
+        }
+
+        hr = StringCchCopy(pName, cchLength + 1, pcwsz);
+        if (FAILED(hr))
+        {
+            goto done;
+        }
+    }
+    else
+    {
+        hr = StringFromCLSID(guid, &pName);
+    }
+
+done:
+    if (FAILED(hr))
+    {
+        *ppwsz = NULL;
+        CoTaskMemFree(pName);
+    }
+    else
+    {
+        *ppwsz = pName;
+    }
+    return hr;
+}
+
+void LogUINT32AsUINT64(const PROPVARIANT& var)
+{
+    UINT32 uHigh = 0, uLow = 0;
+    Unpack2UINT32AsUINT64(var.uhVal.QuadPart, &uHigh, &uLow);
+    DBGMSG(L"%d x %d", uHigh, uLow);
+}
+
+float OffsetToFloat(const MFOffset& offset)
+{
+    return offset.value + (static_cast<float>(offset.fract) / 65536.0f);
+}
+
+HRESULT LogVideoArea(const PROPVARIANT& var)
+{
+    if (var.caub.cElems < sizeof(MFVideoArea))
+    {
+        return S_FALSE;
+    }
+
+    MFVideoArea* pArea = (MFVideoArea*)var.caub.pElems;
+
+    DBGMSG(L"(%f,%f) (%d,%d)", OffsetToFloat(pArea->OffsetX), OffsetToFloat(pArea->OffsetY),
+        pArea->Area.cx, pArea->Area.cy);
+    return S_OK;
+}
+
+// Handle certain known special cases.
+HRESULT SpecialCaseAttributeValue(GUID guid, const PROPVARIANT& var)
+{
+    if ((guid == MF_MT_FRAME_RATE) || (guid == MF_MT_FRAME_RATE_RANGE_MAX) ||
+        (guid == MF_MT_FRAME_RATE_RANGE_MIN) || (guid == MF_MT_FRAME_SIZE) ||
+        (guid == MF_MT_PIXEL_ASPECT_RATIO))
+    {
+        // Attributes that contain two packed 32-bit values.
+        LogUINT32AsUINT64(var);
+    }
+    else if ((guid == MF_MT_GEOMETRIC_APERTURE) ||
+        (guid == MF_MT_MINIMUM_DISPLAY_APERTURE) ||
+        (guid == MF_MT_PAN_SCAN_APERTURE))
+    {
+        // Attributes that an MFVideoArea structure.
+        return LogVideoArea(var);
+    }
+    else
+    {
+        return S_FALSE;
+    }
+    return S_OK;
+}
+
+void DBGMSG(PCWSTR format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+    WCHAR msg[MAX_PATH];
+
+    if (SUCCEEDED(StringCbVPrintf(msg, sizeof(msg), format, args)))
+    {
+        OutputDebugString(msg);
+    }
 }
 
 
@@ -617,7 +648,7 @@ HRESULT StartCapture(HWND hDlg)
     IMFMediaTypeHandler* pHandler = NULL;
     IMFMediaType* pType = NULL;
     
-    DWORD cTypes = 0;
+    DWORD nTypes = 0;
     UINT32 count = 0;
 
     // Create the media source for the device.
@@ -644,23 +675,42 @@ HRESULT StartCapture(HWND hDlg)
     }
 
     
-    hr = pHandler->GetMediaTypeCount(&cTypes);
+    hr = pHandler->GetMediaTypeCount(&nTypes);
     if (FAILED(hr))
     {
         goto done;
     }
 
-    for (DWORD i = 0; i < cTypes; i++)
+    for (DWORD i = 0; i < nTypes; i++)
     {
         hr = pHandler->GetMediaTypeByIndex(i, &pType);
         if (FAILED(hr))
         {
             goto done;
         }
+        PROPVARIANT var;
+        PropVariantInit(&var);
 
-        LogMediaType(pType);
-        OutputDebugString(L"\n");
-
+        // Get frame rate
+        UINT32 uHigh, uLow;
+        pType->GetItem(MF_MT_FRAME_RATE, &var);
+        Unpack2UINT32AsUINT64(var.uhVal.QuadPart, &uHigh, &uLow);
+        
+        // Get subtype
+        WCHAR* pGuidValName = NULL;
+        pType->GetItem(MF_MT_SUBTYPE, &var);
+        GetGUIDName(*var.puuid, &pGuidValName);
+        
+        if ((uHigh == 60 || uLow == 60) && wcscmp(pGuidValName, L"MFVideoFormat_NV12") == 0)
+        {
+            hr = pHandler->SetCurrentMediaType(pType);
+            PropVariantClear(&var);
+            SafeRelease(&pType);
+            break;
+        }
+        
+        
+        PropVariantClear(&var);
         SafeRelease(&pType);
     }
 
